@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#060A10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Trailer Ops</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%23060A10'/%3E%3Crect x='96' y='120' width='320' height='272' rx='12' fill='none' stroke='%233DE0FF' stroke-width='24'/%3E%3Cpath d='M96 196h320M96 252h320M96 308h320' stroke='%233DE0FF' stroke-width='16'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* FSWI Trailer Ops: dark HUD. Layout: sticky header, door grid of mini trailers, door detail with a live top-down trailer (nose left, rear door right). */
+:root{
+  color-scheme:dark;
+  --bg:#060A10;--bg2:#0A1019;--panel:#0C1520;--panel2:#101C2A;--line:#1A2A3C;--line2:#2B4259;
+  --ink:#E7F2FB;--ink2:#8EA6BB;--cyan:#3DE0FF;--cyan-ink:#031318;--amber:#FFB020;--red:#FF5468;--green:#35E3A4;
+  --f-disp:"Rajdhani","Arial Narrow",system-ui,sans-serif;--f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:500 17px/1.35 var(--f-disp);min-height:100%;
+  background-image:linear-gradient(rgba(61,224,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(61,224,255,.035) 1px,transparent 1px),radial-gradient(900px 420px at 80% -8%,rgba(61,224,255,.10),transparent 70%);
+  background-size:44px 44px,44px 44px,100% 100%;background-attachment:fixed}
+button,input,select,textarea{font:inherit;color:inherit}
+button,a,input{touch-action:manipulation}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-disp);font-weight:700;margin:0;letter-spacing:.04em;text-transform:uppercase}
+.num,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--ink2)}
+.eyebrow{font:600 12px var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--cyan)}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:rgba(6,10,16,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line2);box-shadow:0 1px 0 rgba(61,224,255,.18),0 8px 30px rgba(0,0,0,.35)}
+.top .wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-top:8px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-mark{width:34px;height:34px;display:grid;place-items:center;font:700 13px var(--f-mono);color:var(--cyan-ink);background:var(--cyan);clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);box-shadow:0 0 18px rgba(61,224,255,.6)}
+.brand h1{font-size:22px;white-space:nowrap}
+.brand h1 small{display:block;font:500 10px var(--f-mono);letter-spacing:.22em;color:var(--ink2);margin-top:1px}
+nav{display:flex;gap:2px;margin-left:auto;overflow-x:auto;max-width:100%}
+nav a{color:var(--ink2);text-decoration:none;padding:12px 16px 12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:15px;border-bottom:3px solid transparent;white-space:nowrap}
+nav a[aria-current="page"]{color:var(--cyan);border-bottom-color:var(--cyan);text-shadow:0 0 12px rgba(61,224,255,.6)}
+nav a:hover{color:var(--ink)}
+
+.banner{background:rgba(255,176,32,.08);border-bottom:1px solid rgba(255,176,32,.35);padding-block:9px;font-size:15px;color:#FFD58A}
+.banner.bad{background:rgba(255,84,104,.09);border-color:rgba(255,84,104,.4);color:#FFB3BD}
+.banner:not(.warn):not(.bad){background:rgba(61,224,255,.06);border-color:rgba(61,224,255,.25);color:var(--ink2)}
+main{padding-bottom:calc(56px + env(safe-area-inset-bottom,0px))}
+.page-h{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 24px;flex-wrap:wrap;padding-top:24px;padding-bottom:14px}
+.page-h h2{font-size:36px;line-height:1}
+.page-h p{margin:6px 0 0;color:var(--ink2)}
+.note{border:1px dashed var(--line2);border-radius:10px;padding:14px 16px;margin-bottom:16px;max-width:72ch;background:rgba(61,224,255,.04)}
+
+/* HUD metrics */
+.meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.meter{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 16px 14px}
+.meter::before,.panel::before{content:"";position:absolute;left:-1px;top:-1px;width:14px;height:14px;border-left:2px solid var(--cyan);border-top:2px solid var(--cyan);border-radius:4px 0 0 0;opacity:.8}
+.meter small{display:block;font:600 11px var(--f-mono);letter-spacing:.16em;color:var(--ink2);text-transform:uppercase}
+.meter b{display:block;font:700 40px/1.05 var(--f-disp);margin:2px 0 6px;letter-spacing:.02em}
+.meter b span{font-size:16px;color:var(--ink2);font-weight:600;letter-spacing:.06em}
+.gauge{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.gauge i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),#7CF3FF);box-shadow:0 0 10px var(--cyan);border-radius:3px}
+.gauge.low i{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+.gauge.out i{background:var(--red);box-shadow:0 0 10px var(--red)}
+
+/* buttons */
+.btn{min-height:46px;padding:8px 18px;border-radius:6px;border:1px solid var(--line2);background:var(--panel2);font:700 15px var(--f-disp);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(61,224,255,.25)}
+.btn.primary{background:var(--cyan);border-color:var(--cyan);color:var(--cyan-ink);box-shadow:0 0 18px rgba(61,224,255,.35)}
+.btn.primary:hover{filter:brightness(1.1);box-shadow:0 0 26px rgba(61,224,255,.6)}
+.btn.danger{color:var(--red);border-color:rgba(255,84,104,.45)}
+.btn.armed{background:var(--red);border-color:var(--red);color:#fff}
+.btn.big{min-height:58px;font-size:19px}
+.btn.sm{min-height:38px;padding:4px 12px;font-size:13px}
+.btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* door cards */
+.doors{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.door{position:relative;display:block;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px 14px;text-decoration:none;color:inherit;min-width:0;transition:border-color .15s,transform .15s}
+.door:hover{border-color:var(--cyan);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 18px rgba(61,224,255,.18)}
+.door-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.door-n{display:flex;align-items:baseline;gap:8px}
+.door-n small{font:600 10px var(--f-mono);letter-spacing:.2em;color:var(--ink2)}
+.door-n span{font:700 34px/1 var(--f-disp);letter-spacing:.02em}
+.door-ref{flex:1;min-width:0;text-align:right;font:500 12px var(--f-mono);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip{font:600 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:3px;border:1px solid var(--line2);white-space:nowrap;color:var(--ink2)}
+.chip.good{color:var(--green);border-color:rgba(53,227,164,.5);background:rgba(53,227,164,.08)}
+.chip.warn{color:var(--amber);border-color:rgba(255,176,32,.5);background:rgba(255,176,32,.08)}
+.chip.bad{color:var(--red);border-color:rgba(255,84,104,.5);background:rgba(255,84,104,.08)}
+.door-stats{margin-top:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--ink2);font-size:14px}
+.door-stats b{color:var(--ink);font:600 20px var(--f-mono)}
+.door.free{border-style:dashed;background:transparent}
+.door.free .trailer{opacity:.55}
+.strip{display:flex;gap:6px 30px;flex-wrap:wrap;color:var(--ink2);padding-bottom:16px}
+.strip b{color:var(--ink);font:600 22px var(--f-mono)}
+
+/* trailer svg */
+.trailer{width:100%;height:auto;display:block}
+.trailer.vert{max-width:300px;margin:0 auto}
+.t-body{fill:#08111C;stroke:var(--line2);stroke-width:2}
+.t-cab{fill:#0E1A29;stroke:var(--line2);stroke-width:2}
+.t-hitch{fill:var(--line2)}
+.t-wheel{fill:#15212F;stroke:var(--line2);stroke-width:1}
+.t-door{fill:var(--door);filter:drop-shadow(0 0 7px var(--door))}
+.t-lbl{font:600 13px var(--f-mono);letter-spacing:.14em;fill:var(--ink2)}
+.st-ok{--door:var(--green)}.st-low{--door:var(--amber)}.st-out{--door:var(--red)}.st-free{--door:var(--line2)}
+.slot .s-bg{fill:#0A1521}
+.slot .s-fill{fill:var(--pc);opacity:.42}
+.slot .s-ol{fill:none;stroke:var(--pc);stroke-width:2}
+.slot.empty .s-ol{stroke:var(--line2);stroke-dasharray:5 5}
+.slot.none .s-ol{stroke:var(--line2);stroke-dasharray:3 4}
+.slot.none text{opacity:.4}
+.slot.dim{opacity:.2}
+.slot[data-act]{cursor:pointer;outline:none}
+.slot[data-act]:hover .s-ol,.slot[data-act]:focus-visible .s-ol{stroke-width:3.5;filter:drop-shadow(0 0 6px var(--pc))}
+.slot.empty[data-act]:hover .s-ol{stroke:var(--cyan)}
+.slot.sel .s-ol{stroke:#fff;stroke-width:3.5;filter:drop-shadow(0 0 8px #fff)}
+.s-n{font:600 12px var(--f-mono);fill:var(--ink2)}
+.s-q{font:700 25px var(--f-disp);fill:var(--ink);letter-spacing:.02em}
+.s-plus{font:500 30px var(--f-disp);fill:var(--line2)}
+.mini .s-ol{stroke-width:4}
+.mini .slot.empty .s-ol{stroke-dasharray:none;stroke:var(--line)}
+@media (prefers-reduced-motion:no-preference){
+  .slot.sel .s-ol{animation:selp 1.1s ease-in-out infinite}
+  .slot.pop{transform-box:fill-box;transform-origin:center;animation:pop .35s ease-out}
+  @keyframes selp{50%{opacity:.45}}
+  @keyframes pop{0%{transform:scale(.8);opacity:.3}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+}
+
+/* panels */
+.panel{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 16px 12px;min-width:0}
+.panel>h3,.bay-h h3{font-size:18px;padding:12px 0 8px;letter-spacing:.12em}
+.bay{padding:0 16px 14px;margin-bottom:16px}
+.bay-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.bay-h span{font:500 12px var(--f-mono);color:var(--ink2)}
+.crumb{padding-top:18px}
+.crumb a{color:var(--ink2);text-decoration:none;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:14px}
+.crumb a:hover{color:var(--cyan)}
+.hud-h{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 0 16px}
+.sign{border:2px solid var(--cyan);border-radius:6px;padding:4px 14px 6px;text-align:center;box-shadow:0 0 18px rgba(61,224,255,.35),inset 0 0 14px rgba(61,224,255,.12)}
+.sign small{display:block;font:600 10px var(--f-mono);letter-spacing:.22em;color:var(--cyan)}
+.sign span{font:700 46px/1 var(--f-disp)}
+.hud-t{flex:1;min-width:200px}
+.hud-t h2{font-size:30px;line-height:1.05;overflow-wrap:anywhere}
+.hud-t p{margin:4px 0 0;color:var(--ink2);font-size:15px}
+.two{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.plist{list-style:none;margin:0;padding:0}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.prow:first-child{border-top:0}
+.prow-main{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;text-align:left;background:transparent;border:1px solid transparent;border-radius:6px;padding:6px 8px;cursor:pointer;min-height:56px}
+.prow-main:hover{background:rgba(61,224,255,.05)}
+.prow.hl .prow-main{border-color:var(--pc);background:rgba(255,255,255,.04);box-shadow:0 0 14px color-mix(in srgb,var(--pc) 35%,transparent)}
+.dot{width:14px;height:14px;border-radius:3px;background:var(--pc);box-shadow:0 0 10px var(--pc)}
+.pn{min-width:0}
+.pn b{display:block;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pn small{color:var(--ink2);font:500 12px var(--f-mono)}
+.pn .gauge{margin-top:5px;height:4px}
+.pn .gauge i{background:var(--pc);box-shadow:0 0 8px var(--pc)}
+.pq{text-align:right}
+.pq b{font:600 24px var(--f-mono)}
+.pq small{display:block;color:var(--ink2);font:500 11px var(--f-mono)}
+.prow.gone{opacity:.5}
+.stage{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;padding:6px 0 8px}
+.spal{position:relative;text-align:left;display:grid;gap:2px;padding:8px 10px 12px;border:1px solid var(--pc);border-radius:6px;background:var(--panel2);cursor:pointer;min-height:78px}
+.spal:disabled{opacity:.4;border-style:dashed;border-color:var(--line2);cursor:not-allowed}
+.spal .a{font:600 11px var(--f-mono);color:var(--ink2)}
+.spal .b{font-weight:700;line-height:1.1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.spal .c{font:600 20px var(--f-mono)}
+.empty{padding:40px 8px;text-align:center}
+.empty h3{font-size:26px;margin-bottom:6px}
+.empty p{color:var(--ink2);margin:0 auto 16px;max-width:46ch}
+
+/* summary + history */
+.search{width:100%;max-width:420px;min-height:46px;border:1px solid var(--line2);background:var(--panel);border-radius:6px;padding:8px 14px}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.sq{font:600 28px var(--f-mono);text-align:right}
+.sq small{display:block;font:500 11px var(--f-mono);color:var(--ink2)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;grid-column:1/-1}
+.dchip{border:1px solid var(--line2);background:var(--panel2);border-radius:4px;padding:4px 12px;min-height:38px;cursor:pointer;font:600 13px var(--f-mono)}
+.dchip:hover:not(:disabled){border-color:var(--pc);box-shadow:0 0 10px color-mix(in srgb,var(--pc) 40%,transparent)}
+.dchip:disabled{opacity:.35}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:600px}
+th,td{text-align:left;padding:10px 8px;border-top:1px solid var(--line);font:500 13px var(--f-mono);white-space:nowrap}
+th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);border-top:0}
+td.r,th.r{text-align:right}
+
+/* sheets */
+#overlay{position:fixed;inset:0;z-index:40;background:rgba(2,5,9,.72);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center}
+.sheet{position:relative;width:100%;max-width:580px;max-height:94%;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-bottom:0;border-radius:14px 14px 0 0;box-shadow:0 -10px 50px rgba(0,0,0,.6),0 0 40px rgba(61,224,255,.08);padding:18px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet.wide{max-width:1060px;height:96%}
+@media (min-width:760px){#overlay{align-items:center}.sheet{border-radius:12px;border-bottom:1px solid var(--line2);max-height:92%}.sheet.wide{height:94%}}
+.sheet-h{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px}
+.sheet-h h3{font-size:32px;line-height:1.05}
+.x{border:0;background:transparent;font-size:30px;line-height:1;width:46px;height:46px;border-radius:6px;cursor:pointer;color:var(--ink2)}
+.x:hover{background:var(--panel2);color:var(--ink)}
+label{display:block;font:600 11px var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);margin:14px 0 6px}
+.inp{width:100%;min-height:46px;border:1px solid var(--line2);background:var(--bg2);border-radius:6px;padding:8px 12px}
+.inp:focus{border-color:var(--cyan);outline:none;box-shadow:0 0 0 3px rgba(61,224,255,.2)}
+.stepper{display:grid;grid-template-columns:68px 1fr 68px;gap:8px}
+.stepper button{min-height:64px;font-size:30px;border-radius:6px;border:1px solid var(--line2);background:var(--panel2);cursor:pointer}
+.stepper button:hover{border-color:var(--cyan)}
+.stepper input{min-height:64px;text-align:center;font:600 40px var(--f-mono);border:2px solid var(--cyan);background:var(--bg2);border-radius:6px;width:100%;min-width:0;box-shadow:0 0 18px rgba(61,224,255,.2)}
+.qchips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.prev{margin-top:14px;padding:10px 12px;border-radius:6px;background:var(--bg2);border:1px solid var(--line);font:500 14px var(--f-mono);min-height:46px}
+.prev.bad{color:var(--red);border-color:rgba(255,84,104,.4)}
+.sheet-f{display:flex;gap:8px;margin-top:18px}
+.sheet-f .primary{flex:1}
+.sticky-f{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom,0px));background:var(--panel);padding:12px 0 0;border-top:1px solid var(--line2);margin-top:14px}
+.ehead{display:grid;grid-template-columns:140px 1fr;gap:12px}
+.edit-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;align-items:start}
+@media (max-width:900px){.edit-grid{grid-template-columns:minmax(0,1fr)}}
+.ctl{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:12px 14px 14px}
+.ctl h4{margin:0 0 8px;font:700 22px var(--f-disp);letter-spacing:.06em;text-transform:uppercase}
+.pchips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.pc{display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:6px 14px;border:1px solid var(--line2);border-radius:6px;background:var(--panel2);cursor:pointer;font-weight:700;letter-spacing:.03em}
+.pc i{width:12px;height:12px;border-radius:3px;background:var(--pc);box-shadow:0 0 8px var(--pc)}
+.pc:hover{border-color:var(--pc)}
+.pc.on{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 16%,var(--panel2));box-shadow:0 0 14px color-mix(in srgb,var(--pc) 40%,transparent)}
+.rowf{display:flex;gap:8px;align-items:stretch}
+.rowf .inp{flex:1}
+textarea.inp{min-height:84px;resize:vertical}
+details{margin-top:14px}
+summary{cursor:pointer;font-weight:700;min-height:34px;color:var(--ink2);letter-spacing:.06em;text-transform:uppercase;font-size:14px}
+
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:60;max-width:min(580px,calc(100% - 32px));width:max-content;display:flex;gap:14px;align-items:center;background:#0E1B2A;border:1px solid var(--cyan);color:var(--ink);padding:12px 16px;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 24px rgba(61,224,255,.25);font-size:16px}
+#toast button{background:transparent;border:1px solid var(--cyan);color:var(--cyan);border-radius:5px;padding:6px 12px;font:700 13px var(--f-disp);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;min-height:38px}
+
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="brand-mark">FS</span><h1>Trailer Ops<small>FSWI · DOCK INVENTORY</small></h1></div>
+    <nav id="nav" aria-label="Sections">
+      <a href="#doors" data-v="doors">Doors</a>
+      <a href="#summary" data-v="summary">Summary</a>
+      <a href="#history" data-v="history">History</a>
+    </nav>
+  </div>
+</header>
+<div id="banner"></div>
+<main id="main"></main>
+<div id="overlay" hidden></div>
+<div id="toast" role="status" hidden></div>
+<!-- SHARING BETWEEN TABLETS (optional): paste your Firebase web-app settings here. See README.md.
+     Leave apiKey empty to run in local mode (data stays on this one tablet). -->
+<script>
+window.FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
+</script>
+<script>
+/* FSWI Trailer Ops
+   Shared inventory for trailers parked at the dock doors.
+   Data (Claude artifact db, Firebase Firestore, or local mode, all with the same small API):
+     doors/d{N}      -> { door, label, ref, loadId, pallets:[{n,product,qty}], loadedAt }
+     added/{id}      -> { door, loadId, product, qty, by, ts }                 (pallets added later)
+     picks/{id}      -> { door, loadId, pallet, product, qty, by, ts, kind }   (append-only log: pull | remove)
+     config/products -> { list:[...] }  (append-only; position decides the product's color)
+   Stock left = pallet qty - sum of picks, so two forklifts working at once never overwrite each other. */
+(function(){
+"use strict";
+var UNIT="cases", NDOORS=15, NPAL=24;
+var $=function(s){return document.querySelector(s)};
+var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
+var nf=function(n){return Number(n).toLocaleString("en-US")};
+var ls={get:function(k){try{return localStorage.getItem(k)||""}catch(e){return ""}},set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+var S={db:null,mode:"",state:"loading",slow:false,err:null,doors:{},picks:[],added:[],products:[],filter:"",hl:"",D:{},view:"doors",door:0};
+var CAT=S.products;
+var main=$("#main"), overlay=$("#overlay"), toastEl=$("#toast"), toastT=null;
+var PICK=null, ED=null, ADD=null, narrowNow=null;
+
+function hue(p){var h=0,s=String(p).toLowerCase();for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h%360}
+function colorOf(p){var i=CAT.indexOf(p),h=i>=0?(i*137.508+18)%360:hue(p);return "hsl("+Math.round(h)+" 88% 60%)"}
+function tint(p){return "--pc:"+colorOf(p)}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function fmtT(ts){try{return new Date(ts).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}catch(e){return ""}}
+function norm(s){return String(s||"").replace(/\s+/g," ").trim()}
+function isNarrow(){return window.innerWidth<720}
+function pad2(l){return /^\d$/.test(l)?"0"+l:l}
+
+/* ---------- derived inventory ---------- */
+function derive(){
+  var D={};
+  for(var n=1;n<=NDOORS;n++){
+    var d=S.doors[n], loaded=!!(d&&d.loadId&&d.pallets&&d.pallets.length);
+    var o={n:n,d:d,loaded:loaded,rows:[],total:0,left:0,products:[],label:(d&&d.label)||String(n),status:"free"};
+    if(loaded){
+      var got={};
+      S.picks.forEach(function(p){if(p.door===n&&p.loadId===d.loadId)got[pid(p)]=(got[pid(p)]||0)+p.qty});
+      var base=d.pallets.slice().sort(function(a,b){return a.n-b.n}).map(function(p){return {id:"p"+p.n,n:p.n,label:"P"+p.n,product:p.product,qty:p.qty,added:false}});
+      var extra=S.added.filter(function(a){return a.door===n&&a.loadId===d.loadId}).sort(function(a,b){return a.ts-b.ts}).map(function(a,i){return {id:a.id,n:NPAL+i+1,label:"A"+(i+1),product:a.product,qty:a.qty,added:true,by:a.by}});
+      o.rows=base.concat(extra).map(function(p){var x=got[p.id]||0;p.out=x;p.left=Math.max(0,p.qty-x);return p});
+      var m={};
+      o.rows.forEach(function(r){
+        o.total+=r.qty;o.left+=r.left;
+        var x=m[r.product]||(m[r.product]={product:r.product,left:0,qty:0,pallets:0,open:0});
+        x.left+=r.left;x.qty+=r.qty;x.pallets++;if(r.left>0)x.open++;
+      });
+      o.products=Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return a.product.localeCompare(b.product,"en")});
+      o.status=o.left===0?"out":(o.total&&o.left/o.total<=0.2)?"low":"ok";
+    }
+    D[n]=o;
+  }
+  S.D=D;
+}
+function summary(){
+  var m={};
+  for(var n=1;n<=NDOORS;n++){S.D[n].products.forEach(function(p){
+    var x=m[p.product]||(m[p.product]={product:p.product,left:0,doors:[]});
+    x.left+=p.left;x.doors.push({n:n,label:S.D[n].label,left:p.left});
+  })}
+  return Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return a.product.localeCompare(b.product,"en")});
+}
+/* Take from the emptiest pallet first so partial pallets are finished before full ones. */
+function allocate(door,product,qty,pallet){
+  var rows=S.D[door].rows.filter(function(r){return r.product===product&&r.left>0&&(!pallet||r.id===pallet)});
+  rows.sort(function(a,b){return a.left-b.left||a.n-b.n});
+  var out=[],need=qty;
+  for(var i=0;i<rows.length&&need>0;i++){var t=Math.min(rows[i].left,need);out.push({pallet:rows[i].id,label:rows[i].label,qty:t});need-=t}
+  return {out:out,short:need,rows:rows};
+}
+function pid(p){return typeof p.pallet==="number"?"p"+p.pallet:p.pallet}
+function palLabel(door,id){var r=S.D[door].rows.filter(function(x){return x.id===id})[0];return r?r.label:"?"}
+
+/* ---------- trailer drawing (top-down; nose left, rear door right; vertical on phones) ---------- */
+function trailerSVG(slots,o){
+  o=o||{};
+  var V=!!o.vertical,mini=!!o.mini;
+  var L=870,Wd=190,u0=90,v0=30,pad=14,gap=8,cols=12;
+  var sl=(L-2*pad-(cols-1)*gap)/cols, sw=(Wd-2*pad-gap)/2;
+  function R(u,v,lu,lv){return V?{x:v,y:u,w:lv,h:lu}:{x:u,y:v,w:lu,h:lv}}
+  function rect(cls,r,rx){return '<rect class="'+cls+'" x="'+r.x+'" y="'+r.y+'" width="'+r.w+'" height="'+r.h+'"'+(rx?' rx="'+rx+'"':'')+'/>'}
+  var s='<svg class="trailer'+(mini?' mini':'')+(V?' vert':'')+' st-'+(o.status||"free")+'" viewBox="'+(V?"0 0 260 1000":"0 0 1000 260")+'" role="img" aria-label="'+esc(o.aria||"Trailer")+'">';
+  s+=rect("t-cab",R(0,v0+34,72,Wd-68),14)+rect("t-hitch",R(72,v0+Wd/2-5,20,10));
+  [0,1].forEach(function(k){var wu=u0+L-170+k*64;s+=rect("t-wheel",R(wu,v0-8,46,8),2)+rect("t-wheel",R(wu,v0+Wd,46,8),2)});
+  s+=rect("t-body",R(u0,v0,L,Wd),10);
+  for(var i=1;i<=NPAL;i++){
+    var col=Math.floor((i-1)/2),row=(i-1)%2,u=u0+pad+col*(sl+gap),v=v0+pad+row*(sw+gap);
+    var r=R(u,v,sl,sw),p=slots[i],cls="slot",attr="";
+    if(!p)cls+=" empty";else if(p.left===0)cls+=" none";else if(p.left<p.qty)cls+=" part";else cls+=" full";
+    if(o.hl&&p&&p.product!==o.hl)cls+=" dim";
+    if(o.sel===i)cls+=" sel";
+    if(o.pop===i)cls+=" pop";
+    if(o.editor)attr=' data-act="ed-sel" data-i="'+i+'" tabindex="0" role="button" aria-label="Slot P'+i+(p?", "+esc(p.product):", empty")+'"';
+    else if(o.interactive&&p&&p.left>0)attr=' data-act="pick-pallet" data-door="'+o.door+'" data-pid="'+esc(p.id)+'" tabindex="0" role="button" aria-label="'+esc(p.label+", "+p.product+", "+p.left+" left")+'"';
+    s+='<g class="'+cls+'"'+(p?' style="'+tint(p.product)+'"':'')+attr+'>'+rect("s-bg",r,5);
+    if(p){var fh=p.qty?r.h*p.left/p.qty:0;s+='<rect class="s-fill" x="'+r.x+'" y="'+(r.y+r.h-fh)+'" width="'+r.w+'" height="'+fh+'" rx="5"/>'}
+    s+=rect("s-ol",r,5);
+    if(!mini){
+      s+='<text class="s-n" x="'+(r.x+7)+'" y="'+(r.y+16)+'">P'+i+'</text>';
+      if(p)s+='<text class="s-q" x="'+(r.x+r.w/2)+'" y="'+(r.y+r.h-11)+'" text-anchor="middle">'+nf(p.left)+'</text>';
+      else if(o.editor)s+='<text class="s-plus" x="'+(r.x+r.w/2)+'" y="'+(r.y+r.h/2+14)+'" text-anchor="middle">+</text>';
+    }
+    s+='</g>';
+  }
+  s+=rect("t-door",R(u0+L-2,v0,9,Wd),3);
+  if(!mini){
+    if(V)s+='<text class="t-lbl" x="130" y="992" text-anchor="middle">▲ REAR DOOR'+(o.doorLabel?" "+esc(o.doorLabel):"")+'</text>';
+    else s+='<text class="t-lbl" x="'+(u0)+'" y="250">NOSE</text><text class="t-lbl" x="'+(u0+L)+'" y="250" text-anchor="end">REAR DOOR'+(o.doorLabel?" "+esc(o.doorLabel):"")+' ▸</text>';
+  }
+  return s+'</svg>';
+}
+function slotsOf(o){var a=[];o.rows.forEach(function(r){if(!r.added)a[+r.id.slice(1)]=r});return a}
+
+/* ---------- views ---------- */
+function parseHash(){
+  var h=(location.hash||"").replace("#","");
+  var m=/^door-(\d+)$/.exec(h);
+  if(m&&+m[1]>=1&&+m[1]<=NDOORS){S.view="door";S.door=+m[1]}
+  else if(h==="summary"||h==="history"){S.view=h}
+  else S.view="doors";
+}
+function statusChip(o){
+  if(!o.loaded)return '<span class="chip">Free</span>';
+  if(o.status==="out")return '<span class="chip bad">Empty</span>';
+  if(o.status==="low")return '<span class="chip warn">Almost empty</span>';
+  return '<span class="chip good">In use</span>';
+}
+function gauge(left,total,cls){var pc=total?Math.round(100*left/total):0;return '<div class="gauge '+(cls||"")+'"><i style="width:'+pc+'%"></i></div>'}
+function viewDoors(){
+  var any=false,tl=0,pal=0,used=0;
+  for(var n=1;n<=NDOORS;n++){var o=S.D[n];if(o.loaded){any=true;used++;tl+=o.left;o.rows.forEach(function(r){if(r.left>0)pal++})}}
+  var h='<div class="wrap"><div class="page-h"><div><div class="eyebrow">Dock overview</div><h2>Doors</h2><p>Live stock in every parked trailer.</p></div></div>';
+  h+='<div class="meters"><div class="meter"><small>'+UNIT+' available</small><b class="num">'+nf(tl)+'</b></div><div class="meter"><small>Pallets with product</small><b class="num">'+pal+'</b></div><div class="meter"><small>Doors in use</small><b class="num">'+used+'<span> / '+NDOORS+'</span></b>'+gauge(used,NDOORS)+'</div></div>';
+  if(S.state==="ready"&&!any)h+='<div class="note"><b>No trailers loaded yet.</b> Open a door and tap “Load trailer”. You will see the trailer fill up pallet by pallet as you enter what came in.</div>';
+  h+='<div class="doors">';
+  for(n=1;n<=NDOORS;n++){
+    var o2=S.D[n];
+    h+='<a class="door'+(o2.loaded?"":" free")+'" href="#door-'+n+'"><div class="door-h"><div class="door-n"><small>DOOR</small><span>'+esc(pad2(o2.label))+'</span></div>'+statusChip(o2)+'<span class="door-ref">'+(o2.loaded?esc(o2.d.ref||""):"")+'</span></div>'+
+      trailerSVG(o2.loaded?slotsOf(o2):[],{mini:true,status:o2.status,aria:"Door "+o2.label+" trailer"})+
+      (o2.loaded?'<div class="door-stats"><span><b>'+nf(o2.left)+'</b> '+UNIT+'</span><span class="num">'+o2.rows.filter(function(r){return r.left>0}).length+' / '+o2.rows.length+' pallets</span></div>'+gauge(o2.left,o2.total,o2.status==="low"?"low":o2.status==="out"?"out":"")
+        :'<div class="door-stats"><span>Awaiting trailer. Tap to load.</span></div>')+'</a>';
+  }
+  return h+'</div></div>';
+}
+function viewDoor(n){
+  var o=S.D[n];
+  var h='<div class="wrap"><div class="crumb"><a href="#doors">◂ All doors</a></div>';
+  h+='<div class="hud-h"><div class="sign"><small>DOOR</small><span>'+esc(pad2(o.label))+'</span></div><div class="hud-t"><h2>'+(o.loaded?esc(o.d.ref||"Trailer"):"Free door")+'</h2><p>'+(o.loaded?statusChip(o)+' &nbsp;loaded '+esc(fmtT(o.d.loadedAt)):'No trailer at this door.')+'</p></div>';
+  if(o.loaded)h+='<div class="actions"><button class="btn primary" data-act="add" data-door="'+n+'">+ Add pallet</button><button class="btn" data-act="edit" data-door="'+n+'">Fix load</button><button class="btn danger" data-act="clear" data-door="'+n+'" data-confirm="Clear door? Tap again">Clear door</button></div>';
+  h+='</div>';
+  if(!o.loaded){
+    h+='<div class="panel bay"><div class="bay-h"><h3>Awaiting trailer</h3></div>'+trailerSVG([],{vertical:isNarrow(),doorLabel:o.label,aria:"Empty trailer"})+'<div class="empty"><p>When a trailer arrives, load it slot by slot and watch it fill up.</p><button class="btn primary big" data-act="edit" data-door="'+n+'">Load trailer</button></div></div></div>';
+    return h;
+  }
+  var pal=o.rows.filter(function(r){return r.left>0}).length;
+  h+='<div class="meters"><div class="meter"><small>'+UNIT+' left</small><b class="num">'+nf(o.left)+'<span> / '+nf(o.total)+'</span></b>'+gauge(o.left,o.total,o.status==="low"?"low":o.status==="out"?"out":"")+'</div>'+
+     '<div class="meter"><small>Pallets with product</small><b class="num">'+pal+'<span> / '+o.rows.length+'</span></b>'+gauge(pal,o.rows.length)+'</div>'+
+     '<div class="meter"><small>Products</small><b class="num">'+o.products.length+'</b></div></div>';
+  h+='<section class="panel bay"><div class="bay-h"><h3>Live trailer view</h3><span>'+(S.hl?'Showing '+esc(S.hl)+'. Tap it again to show all.':'Tap a pallet to pull from it. Pallets near the door come out first.')+'</span></div>'+
+     trailerSVG(slotsOf(o),{vertical:isNarrow(),status:o.status,interactive:true,door:n,hl:S.hl,doorLabel:o.label,aria:"Door "+o.label+" trailer"})+'</section>';
+  h+='<div class="two"><section class="panel"><h3>By product</h3><ul class="plist">';
+  o.products.forEach(function(p){
+    h+='<li class="prow'+(p.left?'':' gone')+(S.hl===p.product?' hl':'')+'" style="'+tint(p.product)+'"><button class="prow-main" data-act="hl" data-prod="'+esc(p.product)+'" aria-pressed="'+(S.hl===p.product)+'"><span class="dot"></span><div class="pn"><b title="'+esc(p.product)+'">'+esc(p.product)+'</b><small>'+p.open+' of '+p.pallets+' pallets</small>'+gauge(p.left,p.qty)+'</div>'+
+       '<div class="pq"><b>'+nf(p.left)+'</b><small>of '+nf(p.qty)+'</small></div></button>'+
+       '<button class="btn primary" data-act="pick" data-door="'+n+'" data-prod="'+esc(p.product)+'"'+(p.left?'':' disabled')+'>'+(p.left?'Pull':'Out')+'</button></li>';
+  });
+  h+='</ul></section>';
+  var extra=o.rows.filter(function(r){return r.added});
+  if(extra.length){
+    h+='<section class="panel"><h3>Added pallets <span class="muted mono" style="font-size:12px;letter-spacing:.06em;text-transform:none">staged at this door</span></h3><div class="stage">';
+    extra.forEach(function(r){
+      h+='<button class="spal" style="'+tint(r.product)+'" data-act="pick-pallet" data-door="'+n+'" data-pid="'+esc(r.id)+'"'+(r.left?'':' disabled')+'><span class="a">'+r.label+'</span><span class="b">'+esc(r.product)+'</span><span class="c">'+nf(r.left)+' <small class="muted" style="font-size:12px">/ '+nf(r.qty)+'</small></span></button>';
+    });
+    h+='</div></section>';
+  }
+  return h+'</div></div>';
+}
+function viewSummary(){
+  var all=summary(), f=S.filter.toLowerCase();
+  var list=all.filter(function(x){return !f||x.product.toLowerCase().indexOf(f)>=0});
+  var tl=all.reduce(function(a,x){return a+x.left},0);
+  var h='<div class="wrap"><div class="page-h"><div><div class="eyebrow">All doors</div><h2>Summary</h2><p>What we have, by product and by door.</p></div><button class="btn" data-act="export-inv">Download inventory (CSV)</button></div>';
+  h+='<div class="meters"><div class="meter"><small>'+UNIT+' total</small><b class="num">'+nf(tl)+'</b></div><div class="meter"><small>Products</small><b class="num">'+all.length+'</b></div></div>';
+  h+='<input id="filter" class="search" type="search" placeholder="Search product" value="'+esc(S.filter)+'" aria-label="Search product"><div class="panel" style="margin-top:14px">';
+  if(!list.length)h+='<div class="empty"><p>'+(all.length?'No product matches your search.':'No product registered yet. Load a trailer on any door.')+'</p></div>';
+  list.forEach(function(x){
+    h+='<div class="srow" style="'+tint(x.product)+'"><div class="pn" style="display:flex;gap:12px;align-items:center"><span class="dot"></span><b style="white-space:normal">'+esc(x.product)+'</b></div><div class="sq">'+nf(x.left)+'<small>'+UNIT+'</small></div><div class="chips">';
+    x.doors.forEach(function(d){h+='<button class="dchip" style="'+tint(x.product)+'" data-act="pick" data-door="'+d.n+'" data-prod="'+esc(x.product)+'"'+(d.left?'':' disabled')+'>Door '+esc(d.label)+' · '+nf(d.left)+'</button>'});
+    h+='</div></div>';
+  });
+  return h+'</div></div>';
+}
+function logEntries(){
+  var out=[];
+  S.picks.forEach(function(p){var d=S.doors[p.door];if(d&&d.loadId&&d.loadId===p.loadId)out.push({t:p.kind==="remove"?"Removed":"Pulled",coll:"picks",id:p.id,ts:p.ts,door:p.door,pal:palLabel(p.door,pid(p)),product:p.product,qty:p.qty,by:p.by})});
+  S.added.forEach(function(a){var d=S.doors[a.door];if(d&&d.loadId&&d.loadId===a.loadId)out.push({t:"Added",coll:"added",id:a.id,ts:a.ts,door:a.door,pal:palLabel(a.door,a.id),product:a.product,qty:a.qty,by:a.by})});
+  return out.sort(function(a,b){return b.ts-a.ts});
+}
+function viewHistory(){
+  var cur=logEntries();
+  var h='<div class="wrap"><div class="page-h"><div><div class="eyebrow">Activity log</div><h2>History</h2><p>Pulls, added and removed pallets for trailers currently at a door.</p></div>'+(cur.length?'<button class="btn" data-act="export-log">Download history (CSV)</button>':'')+'</div><div class="panel">';
+  if(!cur.length)h+='<div class="empty"><p>Nothing has happened yet.</p></div>';
+  else{
+    h+='<div class="tw"><table><thead><tr><th>Time</th><th>Action</th><th>Door</th><th>Pallet</th><th>Product</th><th class="r">'+UNIT+'</th><th>Who</th><th></th></tr></thead><tbody>';
+    cur.slice(0,300).forEach(function(p){
+      h+='<tr><td>'+esc(fmtT(p.ts))+'</td><td>'+p.t+'</td><td>'+esc(S.D[p.door].label)+'</td><td>'+esc(p.pal)+'</td><td>'+esc(p.product)+'</td><td class="r">'+nf(p.qty)+'</td><td>'+esc(p.by)+'</td><td class="r"><button class="btn sm danger" data-act="undo" data-coll="'+p.coll+'" data-id="'+esc(p.id)+'" data-confirm="Undo? Tap again">Undo</button></td></tr>';
+    });
+    h+='</tbody></table></div>';
+    if(cur.length>300)h+='<p class="muted">Showing the latest 300 entries.</p>';
+  }
+  return h+'</div></div>';
+}
+
+function renderBanner(){
+  var b=$("#banner"),m="",c="";
+  if(S.err){m=S.err==="nofirebase"?"Could not load Firebase. Check the tablet's internet connection and reload.":"Lost connection to the inventory ("+S.err+"). Reload the page to try again.";c="bad"}
+  else if(S.state==="loading"){m=S.slow?"Still no connection to the inventory. What you see may be out of date.":"Connecting to the inventory…";c=S.slow?"warn":""}
+  else if(S.mode==="local"){m="Local mode: inventory is saved only on this tablet. Add your Firebase settings to share it across tablets (see README).";c="warn"}
+  b.innerHTML=m?'<div class="banner '+c+'"><div class="wrap">'+esc(m)+'</div></div>':"";
+}
+function render(){
+  var a=document.activeElement,keep=a&&a.id==="filter"?{s:a.selectionStart,e:a.selectionEnd}:null;
+  derive();renderBanner();
+  Array.prototype.forEach.call(document.querySelectorAll("#nav a"),function(x){
+    var cur=x.dataset.v===S.view||(S.view==="door"&&x.dataset.v==="doors");
+    if(cur)x.setAttribute("aria-current","page");else x.removeAttribute("aria-current");
+  });
+  main.innerHTML=S.view==="door"?viewDoor(S.door):S.view==="summary"?viewSummary():S.view==="history"?viewHistory():viewDoors();
+  if(keep){var f=$("#filter");if(f){f.focus();try{f.setSelectionRange(keep.s,keep.e)}catch(e){}}}
+  updatePreview();
+}
+
+/* ---------- toast / overlay ---------- */
+function toast(msg,action){
+  clearTimeout(toastT);
+  toastEl.innerHTML='<span>'+esc(msg)+'</span>'+(action?'<button id="toast-a">'+esc(action.label)+'</button>':"");
+  toastEl.hidden=false;
+  if(action)$("#toast-a").onclick=function(){toastEl.hidden=true;action.fn()};
+  toastT=setTimeout(function(){toastEl.hidden=true},action?9000:4500);
+}
+function closeOverlay(){overlay.hidden=true;overlay.innerHTML="";PICK=null;ED=null;ADD=null;CAT=S.products}
+function needWrite(){if(!S.db){toast("Not connected to the inventory yet.");return false}return true}
+function failMsg(){toast("Could not save. Check the connection and your permissions, then try again.")}
+
+/* ---------- pull product ---------- */
+function openPick(door,product,pallet){
+  if(!needWrite())return;
+  var o=S.D[door];if(!o.loaded)return;
+  PICK={door:door,product:product,pallet:pallet||0};
+  overlay.innerHTML='<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pk-t">'+
+    '<div class="sheet-h"><div><div class="eyebrow">Door '+esc(o.label)+(o.d.ref?' · '+esc(o.d.ref):'')+(pallet?' · Pallet '+palLabel(door,pallet):'')+'</div><h3 id="pk-t" style="display:flex;gap:12px;align-items:center;'+tint(product)+'"><span class="dot"></span>'+esc(product)+'</h3></div><button class="x" data-act="close" aria-label="Close">×</button></div>'+
+    '<p id="pk-left" class="muted mono" style="margin:0"></p>'+
+    '<label for="pk-qty">Quantity to pull ('+UNIT+')</label>'+
+    '<div class="stepper"><button data-act="step" data-d="-1" aria-label="Minus one">−</button><input id="pk-qty" type="number" inputmode="numeric" min="1" step="1" value=""><button data-act="step" data-d="1" aria-label="Plus one">+</button></div>'+
+    '<div class="qchips"><button class="btn sm" data-act="qty" data-v="full">Full pallet</button><button class="btn sm" data-act="qty" data-v="add5">+5</button><button class="btn sm" data-act="qty" data-v="add10">+10</button><button class="btn sm" data-act="qty" data-v="all">All</button></div>'+
+    '<div id="pk-prev" class="prev" aria-live="polite"></div>'+
+    '<label for="pk-by">Your name</label><input id="pk-by" class="inp" autocomplete="name" placeholder="Forklift driver name" value="'+esc(ls.get("fswi-op"))+'">'+
+    '<div class="sheet-f"><button class="btn" data-act="close">Cancel</button><button id="pk-ok" class="btn primary big" data-act="confirm-pick">Confirm pull</button></div>'+
+    (pallet?'<div class="sheet-f" style="margin-top:10px"><button class="btn danger" style="flex:1" data-act="remove-pallet">Remove whole pallet</button></div><p class="muted" style="font-size:14px;margin:8px 0 0">Use this when the whole pallet leaves the trailer. It is recorded in History and can be undone.</p>':'')+'</div>';
+  overlay.hidden=false;
+  updatePreview();
+  var q=$("#pk-qty");q.focus();
+  q.addEventListener("input",updatePreview);
+  q.addEventListener("keydown",function(e){if(e.key==="Enter")confirmPick()});
+}
+function updatePreview(){
+  if(!PICK||!$("#pk-qty"))return;
+  var o=S.D[PICK.door],pv=$("#pk-prev"),ok=$("#pk-ok"),lf=$("#pk-left");
+  if(!o||!o.loaded){lf.textContent="This door no longer has a trailer.";pv.textContent="";pv.className="prev bad";ok.disabled=true;return}
+  var base=allocate(PICK.door,PICK.product,Infinity,PICK.pallet);
+  var avail=base.rows.reduce(function(a,r){return a+r.left},0);
+  lf.textContent=nf(avail)+" "+UNIT+" left in "+base.rows.length+(base.rows.length===1?" pallet":" pallets")+(PICK.pallet?" (this pallet).":" of this product.");
+  var qty=parseInt($("#pk-qty").value,10);
+  if(!(qty>0)){pv.className="prev";pv.textContent=avail?"Enter how many "+UNIT+" you are pulling.":"None of this product is left at this door.";ok.disabled=true;return}
+  var a=allocate(PICK.door,PICK.product,qty,PICK.pallet);
+  if(a.short>0){pv.className="prev bad";pv.textContent="Only "+nf(avail)+" "+UNIT+" left. Lower the quantity.";ok.disabled=true;return}
+  pv.className="prev";
+  pv.textContent="Pulling from: "+a.out.map(function(x){return x.label+" ("+nf(x.qty)+")"}).join(" · ")+". "+nf(avail-qty)+" will remain.";
+  ok.disabled=false;
+}
+async function confirmPick(){
+  if(!PICK||!needWrite())return;
+  var qty=parseInt($("#pk-qty").value,10),by=norm($("#pk-by").value);
+  if(!by){toast("Enter your name.");$("#pk-by").focus();return}
+  if(!(qty>0)){toast("Enter a quantity.");return}
+  var P=PICK,o=S.D[P.door],a=allocate(P.door,P.product,qty,P.pallet);
+  if(!o.loaded||a.short>0||!a.out.length){toast("That quantity is no longer available. Check the inventory.");return}
+  ls.set("fswi-op",by);
+  var btn=$("#pk-ok");btn.disabled=true;
+  var refs=[];
+  try{
+    for(var i=0;i<a.out.length;i++){
+      refs.push(await S.db.collection("picks").add({door:P.door,loadId:o.d.loadId,pallet:a.out[i].pallet,product:P.product,qty:a.out[i].qty,by:by,ts:Date.now(),kind:"pull"}));
+    }
+  }catch(e){
+    for(var k=0;k<refs.length;k++){try{await refs[k].delete()}catch(_){}}
+    btn.disabled=false;failMsg();return;
+  }
+  var before=allocate(P.door,P.product,Infinity,0).rows.reduce(function(s,r){return s+r.left},0);
+  closeOverlay();
+  toast("Pulled "+nf(qty)+" "+UNIT+" of "+P.product+" · Door "+o.label+". "+nf(before-qty)+" left.",{label:"Undo",fn:async function(){
+    try{for(var j=0;j<refs.length;j++)await refs[j].delete();toast("Pull undone.")}catch(e){failMsg()}
+  }});
+}
+
+/* ---------- add / remove pallets ---------- */
+function openAdd(door){
+  if(!needWrite())return;
+  var o=S.D[door];if(!o.loaded)return;
+  ADD={door:door};
+  var list=S.products.slice();o.products.forEach(function(p){if(list.indexOf(p.product)<0)list.push(p.product)});
+  overlay.innerHTML='<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ad-t">'+
+    '<div class="sheet-h"><div><div class="eyebrow">Door '+esc(o.label)+(o.d.ref?' · '+esc(o.d.ref):'')+'</div><h3 id="ad-t">Add pallet</h3></div><button class="x" data-act="close" aria-label="Close">×</button></div>'+
+    '<p class="muted" style="margin:0">Use this for a pallet that was brought to this trailer or was missing from the load.</p>'+
+    '<label>Product</label><div class="pchips">'+list.map(function(p){return '<button class="pc" style="'+tint(p)+'" data-act="ad-chip" data-prod="'+esc(p)+'"><i></i>'+esc(p)+'</button>'}).join("")+'</div>'+
+    '<input id="ad-prod" class="inp" autocomplete="off" placeholder="Or type a new product">'+
+    '<label for="ad-qty">Quantity ('+UNIT+')</label><input id="ad-qty" class="inp num" type="number" inputmode="numeric" min="1" placeholder="e.g. 60" style="font-size:26px;min-height:58px">'+
+    '<label for="ad-by">Your name</label><input id="ad-by" class="inp" autocomplete="name" placeholder="Forklift driver name" value="'+esc(ls.get("fswi-op"))+'">'+
+    '<div class="sheet-f"><button class="btn" data-act="close">Cancel</button><button class="btn primary big" data-act="confirm-add">Add pallet</button></div></div>';
+  overlay.hidden=false;
+  $("#ad-prod").focus();
+}
+function adChip(prod){
+  $("#ad-prod").value=prod;
+  Array.prototype.forEach.call(document.querySelectorAll("[data-act=ad-chip]"),function(c){c.classList.toggle("on",c.dataset.prod===prod)});
+  var o=S.D[ADD.door],q=$("#ad-qty"),m=o.rows.filter(function(r){return r.product===prod})[0];
+  if(!q.value&&m)q.value=m.qty;
+  q.focus();
+}
+async function confirmAdd(){
+  if(!ADD||!needWrite())return;
+  var door=ADD.door,o=S.D[door],prod=norm($("#ad-prod").value),qty=parseInt($("#ad-qty").value,10),by=norm($("#ad-by").value);
+  if(!o.loaded){toast("This door no longer has a trailer.");return}
+  if(!prod){toast("Choose or type the product.");$("#ad-prod").focus();return}
+  if(!(qty>0)){toast("Enter the quantity.");$("#ad-qty").focus();return}
+  if(!by){toast("Enter your name.");$("#ad-by").focus();return}
+  var cat={};S.products.forEach(function(p){cat[p.toLowerCase()]=p});
+  var isNew=!cat[prod.toLowerCase()];prod=cat[prod.toLowerCase()]||prod;
+  ls.set("fswi-op",by);
+  try{
+    await S.db.collection("added").add({door:door,loadId:o.d.loadId,product:prod,qty:qty,by:by,ts:Date.now()});
+    if(isNew)await S.db.doc("config/products").set({list:S.products.concat([prod])});
+  }catch(e){failMsg();return}
+  closeOverlay();
+  toast("Added "+nf(qty)+" "+UNIT+" of "+prod+" · Door "+o.label+".");
+}
+async function removePallet(){
+  if(!PICK||!PICK.pallet||!needWrite())return;
+  var P=PICK,o=S.D[P.door],r=o.rows.filter(function(x){return x.id===P.pallet})[0],by=norm($("#pk-by").value);
+  if(!r||r.left<=0){toast("This pallet is already empty.");return}
+  if(!by){toast("Enter your name.");$("#pk-by").focus();return}
+  ls.set("fswi-op",by);
+  var ref;
+  try{ref=await S.db.collection("picks").add({door:P.door,loadId:o.d.loadId,pallet:r.id,product:r.product,qty:r.left,by:by,ts:Date.now(),kind:"remove"})}
+  catch(e){failMsg();return}
+  closeOverlay();
+  toast("Removed pallet "+r.label+" ("+nf(r.left)+" "+UNIT+" of "+r.product+") from door "+o.label+".",{label:"Undo",fn:async function(){try{await ref.delete();toast("Removal undone.")}catch(e){failMsg()}}});
+}
+
+/* ---------- visual loader (fill the trailer slot by slot) ---------- */
+function openEditor(n){
+  if(!needWrite())return;
+  var o=S.D[n];
+  ED={n:n,cat:S.products.slice(),slots:[],sel:1,defQty:0,last:"",pop:0};
+  for(var i=1;i<=NPAL;i++)ED.slots[i]=null;
+  if(o.loaded)o.rows.forEach(function(r){
+    if(!r.added){ED.slots[+r.id.slice(1)]={product:r.product,qty:r.qty};ED.defQty=r.qty;ED.last=r.product}
+    if(ED.cat.indexOf(r.product)<0)ED.cat.push(r.product);
+  });
+  CAT=ED.cat;
+  for(i=1;i<=NPAL;i++)if(!ED.slots[i]){ED.sel=i;break}
+  overlay.innerHTML='<div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="ed-t"><div class="sheet-h"><div><div class="eyebrow">'+(o.loaded?'Fix load':'New trailer')+'</div><h3 id="ed-t">Load door '+esc(o.label)+'</h3></div><button class="x" data-act="close" aria-label="Close">×</button></div>'+
+    '<div class="ehead"><div><label for="e-label" style="margin-top:0">Door number</label><input id="e-label" class="inp" value="'+esc(o.label)+'" maxlength="12"></div><div><label for="e-ref" style="margin-top:0">Trailer or container</label><input id="e-ref" class="inp" placeholder="e.g. trailer number" value="'+esc(o.loaded?o.d.ref||"":"")+'" maxlength="40"></div></div>'+
+    '<div class="edit-grid" style="margin-top:14px"><div><div id="ed-trailer"></div><p id="e-count" class="muted mono" style="margin:8px 0 0"></p></div>'+
+    '<div class="ctl"><h4 id="ed-title"></h4>'+
+      '<label>Product (tap to place it)</label><div class="pchips" id="ed-chips"></div>'+
+      '<div class="rowf"><input id="ed-new" class="inp" placeholder="New product name" autocomplete="off"><button class="btn" data-act="ed-newprod">Add</button></div>'+
+      '<label for="ed-qty">'+UNIT+' on this pallet</label><input id="ed-qty" class="inp num" type="number" inputmode="numeric" min="1" placeholder="e.g. 60" style="font-size:28px;min-height:60px">'+
+      '<div class="actions" style="margin-top:12px"><button class="btn sm" data-act="ed-prev">◂ Prev</button><button class="btn sm" data-act="ed-next">Next ▸</button><button class="btn sm danger" data-act="ed-clear">Clear slot</button></div>'+
+      '<div class="actions" style="margin-top:8px"><button class="btn sm" id="ed-fill" data-act="ed-fill">Fill empty slots</button></div>'+
+      '<details><summary>Paste a list</summary><p class="muted" style="margin:6px 0">One line per pallet: <b>product, cases</b>. <b>slot, product, cases</b> also works.</p><textarea id="e-paste" class="inp" placeholder="White Bread, 60&#10;Whole Wheat, 48"></textarea><div class="actions" style="margin-top:8px"><button class="btn sm" data-act="apply-paste">Apply list</button><button class="btn sm" data-act="sample">Fill with example</button></div></details>'+
+    '</div></div>'+
+    '<div class="sticky-f">'+(o.loaded?'<p class="muted" style="margin:0 0 8px;font-size:14px">Pulls already recorded are kept.</p>':'')+'<div class="sheet-f" style="margin-top:0"><button class="btn" data-act="close">Cancel</button><button class="btn primary big" data-act="save-load">Save load</button></div></div></div>';
+  overlay.hidden=false;
+  var q=$("#ed-qty");
+  q.addEventListener("input",function(){
+    var v=parseInt(q.value,10);if(v>0){ED.defQty=v;var s=ED.slots[ED.sel];if(s)s.qty=v}
+    updateEd(true);
+  });
+  $("#ed-new").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();edNewProd()}});
+  edSelect(ED.sel);
+}
+function edView(){var a=[];for(var i=1;i<=NPAL;i++){var s=ED.slots[i];a[i]=s?{id:"p"+i,label:"P"+i,product:s.product,qty:s.qty,left:s.qty}:null}return a}
+function updateEd(keepQty){
+  if(!ED)return;
+  var used=0,t=0;for(var i=1;i<=NPAL;i++){var s=ED.slots[i];if(s){used++;t+=s.qty}}
+  $("#ed-trailer").innerHTML=trailerSVG(edView(),{vertical:isNarrow(),editor:true,sel:ED.sel,pop:ED.pop,status:used?"ok":"free",doorLabel:$("#e-label")?norm($("#e-label").value):"",aria:"Trailer being loaded"});
+  ED.pop=0;
+  $("#e-count").textContent=used+" of "+NPAL+" pallets loaded · "+nf(t)+" "+UNIT;
+  var cur=ED.slots[ED.sel];
+  $("#ed-title").textContent="Slot P"+ED.sel+(cur?" · "+cur.product:" · empty");
+  $("#ed-chips").innerHTML=ED.cat.slice().sort(function(a,b){return a.localeCompare(b,"en")}).map(function(p){return '<button class="pc'+(cur&&cur.product===p?' on':'')+'" style="'+tint(p)+'" data-act="ed-chip" data-prod="'+esc(p)+'"><i></i>'+esc(p)+'</button>'}).join("")||'<span class="muted">Type a product name below to start.</span>';
+  var f=$("#ed-fill");f.textContent=ED.last?"Fill empty slots with "+ED.last:"Fill empty slots";f.disabled=!(ED.last&&ED.defQty>0);
+}
+function edSelect(i){
+  ED.sel=Math.max(1,Math.min(NPAL,i));
+  var s=ED.slots[ED.sel];$("#ed-qty").value=s?s.qty:(ED.defQty||"");
+  updateEd();
+}
+function edAssign(product){
+  var q=parseInt($("#ed-qty").value,10)||ED.defQty;
+  if(!(q>0)){toast("Enter the "+UNIT+" per pallet first.");$("#ed-qty").focus();return}
+  ED.slots[ED.sel]={product:product,qty:q};ED.defQty=q;ED.last=product;ED.pop=ED.sel;
+  var nxt=0;for(var i=ED.sel+1;i<=NPAL;i++)if(!ED.slots[i]){nxt=i;break}
+  if(!nxt)for(i=1;i<=NPAL;i++)if(!ED.slots[i]){nxt=i;break}
+  if(nxt){var keep=ED.pop;edSelect(nxt);ED.pop=keep;updateEd();ED.pop=0}else{updateEd()}
+}
+function edNewProd(){
+  var v=norm($("#ed-new").value);if(!v)return;
+  var hit=ED.cat.filter(function(p){return p.toLowerCase()===v.toLowerCase()})[0];
+  if(!hit){ED.cat.push(v);hit=v}
+  $("#ed-new").value="";edAssign(hit);
+}
+function applyPaste(){
+  var d=ED.defQty||0,lines=$("#e-paste").value.split(/\r?\n/),next=1,used=0;
+  lines.forEach(function(ln){
+    ln=ln.trim();if(!ln)return;
+    var t=ln.split(/[,;\t]/).map(function(x){return x.trim()}).filter(function(x){return x!==""});
+    if(!t.length)return;
+    var qty=d;
+    if(t.length>1&&/^\d+$/.test(t[t.length-1])){qty=parseInt(t.pop(),10)}
+    var pal=next;
+    if(t.length>1&&/^\d+$/.test(t[0])){pal=parseInt(t.shift(),10)}
+    var prod=norm(t.join(", "));
+    if(!prod||pal<1||pal>NPAL||!(qty>0))return;
+    var hit=ED.cat.filter(function(p){return p.toLowerCase()===prod.toLowerCase()})[0];
+    if(!hit){ED.cat.push(prod);hit=prod}
+    ED.slots[pal]={product:hit,qty:qty};next=pal+1;used++;ED.last=hit;ED.defQty=qty;
+  });
+  edSelect(ED.sel);toast(used?used+" pallets applied.":"No lines were recognized. Add a quantity to each line or set cases per pallet first.");
+}
+function fillSample(){
+  var s=["White Bread","Whole Wheat","Multigrain","Brioche","Cinnamon Raisin","Hawaiian"];
+  s.forEach(function(p){if(ED.cat.indexOf(p)<0)ED.cat.push(p)});
+  for(var i=1;i<=NPAL;i++)ED.slots[i]={product:s[Math.floor((i-1)/2)%s.length],qty:60};
+  ED.last=s[0];ED.defQty=60;
+  if(!$("#e-ref").value)$("#e-ref").value="EXAMPLE";
+  edSelect(1);
+}
+async function saveLoad(){
+  if(!ED||!needWrite())return;
+  var n=ED.n,pallets=[];
+  for(var i=1;i<=NPAL;i++){var s=ED.slots[i];if(s&&s.qty>0)pallets.push({n:i,product:s.product,qty:s.qty})}
+  if(!pallets.length){toast("Place at least one pallet on the trailer.");return}
+  var prev=S.doors[n],keep=prev&&prev.loadId,label=norm($("#e-label").value)||String(n);
+  var cat=ED.cat.slice(),grew=cat.length>S.products.length;
+  try{
+    await S.db.doc("doors/d"+n).set({door:n,label:label,ref:norm($("#e-ref").value),loadId:keep?prev.loadId:uid(),pallets:pallets,loadedAt:keep&&prev.loadedAt?prev.loadedAt:Date.now()});
+    if(grew)await S.db.doc("config/products").set({list:cat});
+  }catch(e){failMsg();return}
+  closeOverlay();toast("Load saved for door "+label+".");
+}
+async function clearDoor(n){
+  if(!needWrite())return;
+  var o=S.D[n],mine=S.picks.filter(function(p){return p.door===n}).map(function(p){return "picks/"+p.id}).concat(S.added.filter(function(p){return p.door===n}).map(function(p){return "added/"+p.id}));
+  try{
+    await S.db.doc("doors/d"+n).set({door:n,label:o.label,loadId:null,ref:"",pallets:[]});
+    for(var i=0;i<mine.length;i+=8)await Promise.all(mine.slice(i,i+8).map(function(path){return S.db.doc(path).delete()}));
+  }catch(e){failMsg();return}
+  S.hl="";toast("Door "+o.label+" cleared.");
+}
+
+/* ---------- CSV ---------- */
+function csv(rows){return "﻿"+rows.map(function(r){return r.map(function(v){v=String(v==null?"":v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(",")}).join("\r\n")}
+function saveCsv(name,rows){
+  var d=new Date(),stamp=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),fn=name+"-"+stamp+".csv",text=csv(rows);
+  if(S.dl){S.dl.save({filename:fn,data:text}).catch(function(e){if(!e||e.code!=="declined")toast("Could not download the file.")});return}
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"}));
+  a.download=fn;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1500);
+}
+function exportInv(){
+  var r=[["Door","Trailer","Pallet","Product","Cases loaded","Cases pulled","Cases left"]];
+  for(var n=1;n<=NDOORS;n++){var o=S.D[n];o.rows.forEach(function(x){r.push([o.label,o.d.ref||"",x.label,x.product,x.qty,x.out,x.left])})}
+  saveCsv("trailer-inventory",r);
+}
+function exportLog(){
+  var r=[["Date","Action","Door","Trailer","Pallet","Product","Cases","Who"]];
+  logEntries().reverse().forEach(function(p){
+    r.push([new Date(p.ts).toLocaleString("en-US"),p.t,S.D[p.door].label,S.D[p.door].d.ref||"",p.pal,p.product,p.qty,p.by]);
+  });
+  saveCsv("trailer-log",r);
+}
+
+/* ---------- events ---------- */
+var A={
+  close:closeOverlay,
+  "pick":function(b){openPick(+b.dataset.door,b.dataset.prod,0)},
+  "pick-pallet":function(b){var o=S.D[+b.dataset.door],r=o.rows.filter(function(x){return x.id===b.dataset.pid})[0];if(r)openPick(o.n,r.product,r.id)},
+  hl:function(b){S.hl=S.hl===b.dataset.prod?"":b.dataset.prod;render()},
+  add:function(b){openAdd(+b.dataset.door)},
+  "ad-chip":function(b){adChip(b.dataset.prod)},
+  "confirm-add":confirmAdd,
+  "remove-pallet":removePallet,
+  edit:function(b){openEditor(+b.dataset.door)},
+  clear:function(b){clearDoor(+b.dataset.door)},
+  undo:async function(b){if(!needWrite())return;try{await S.db.doc((b.dataset.coll||"picks")+"/"+b.dataset.id).delete();toast("Undone.")}catch(e){failMsg()}},
+  step:function(b){var q=$("#pk-qty"),v=(parseInt(q.value,10)||0)+(+b.dataset.d);q.value=Math.max(v,0)||"";updatePreview()},
+  qty:function(b){
+    var q=$("#pk-qty"),cur=parseInt(q.value,10)||0,a=allocate(PICK.door,PICK.product,Infinity,PICK.pallet),v=b.dataset.v;
+    var all=a.rows.reduce(function(s,r){return s+r.left},0);
+    q.value=v==="full"?(a.rows[0]?a.rows[0].left:""):v==="all"?all:Math.min(cur+(v==="add5"?5:10),all)||"";
+    updatePreview();
+  },
+  "confirm-pick":confirmPick,
+  "ed-sel":function(b){edSelect(+b.dataset.i)},
+  "ed-chip":function(b){edAssign(b.dataset.prod)},
+  "ed-newprod":edNewProd,
+  "ed-prev":function(){edSelect(ED.sel-1)},
+  "ed-next":function(){edSelect(ED.sel+1)},
+  "ed-clear":function(){ED.slots[ED.sel]=null;edSelect(ED.sel)},
+  "ed-fill":function(){for(var i=1;i<=NPAL;i++)if(!ED.slots[i])ED.slots[i]={product:ED.last,qty:ED.defQty};edSelect(ED.sel)},
+  "apply-paste":applyPaste,
+  sample:fillSample,
+  "save-load":saveLoad,
+  "export-inv":exportInv,
+  "export-log":exportLog
+};
+document.addEventListener("click",function(e){
+  if(e.target===overlay){closeOverlay();return}
+  var b=e.target.closest("[data-act]");if(!b)return;
+  if(b.dataset.confirm&&!b.classList.contains("armed")){
+    var old=b.textContent;b.textContent=b.dataset.confirm;b.classList.add("armed");
+    setTimeout(function(){if(b.isConnected){b.textContent=old;b.classList.remove("armed")}},4000);return;
+  }
+  if(A[b.dataset.act])A[b.dataset.act](b,e);
+});
+document.addEventListener("keydown",function(e){
+  if(e.key==="Escape"&&!overlay.hidden){closeOverlay();return}
+  if((e.key==="Enter"||e.key===" ")&&e.target.getAttribute&&e.target.getAttribute("role")==="button"&&e.target.dataset.act){e.preventDefault();A[e.target.dataset.act](e.target,e)}
+});
+document.addEventListener("input",function(e){if(e.target.id==="filter"){S.filter=e.target.value;render()}});
+window.addEventListener("hashchange",function(){parseHash();render();window.scrollTo(0,0)});
+window.addEventListener("resize",function(){var n=isNarrow();if(n!==narrowNow){narrowNow=n;if(ED)updateEd();render()}});
+narrowNow=isNarrow();
+
+/* ---------- storage backends ---------- */
+/* Local mode: same small API as Firestore, kept in localStorage (single tablet, for testing). */
+function localStore(){
+  var KEY="fswi-local-v3",data={},subs=[];
+  function load(){try{data=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){data={}}}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}}
+  function notify(){subs.slice().forEach(function(f){f()})}
+  function snapDoc(id,v){return {id:id,exists:v!==undefined,data:function(){return v===undefined?undefined:JSON.parse(JSON.stringify(v))},metadata:{fromCache:false}}}
+  function listen(f){subs.push(f);setTimeout(f,0);return function(){subs=subs.filter(function(x){return x!==f})}}
+  function docRef(c,id){return {
+    id:id,
+    set:function(v){(data[c]=data[c]||{})[id]=JSON.parse(JSON.stringify(v));save();notify();return Promise.resolve()},
+    delete:function(){if(data[c])delete data[c][id];save();notify();return Promise.resolve()},
+    onSnapshot:function(cb){return listen(function(){cb(snapDoc(id,(data[c]||{})[id]))})}
+  }}
+  function colRef(c){return {
+    onSnapshot:function(cb){return listen(function(){var col=data[c]||{};cb({docs:Object.keys(col).map(function(k){return snapDoc(k,col[k])}),metadata:{fromCache:false}})})},
+    add:function(v){var id=uid(),r=docRef(c,id);return r.set(v).then(function(){return r})}
+  }}
+  load();
+  window.addEventListener("storage",function(e){if(e.key===KEY){load();notify()}});
+  return {collection:colRef,doc:function(p){var a=p.split("/");return docRef(a[0],a[1])}};
+}
+function loadScript(src){return new Promise(function(res,rej){var t=document.createElement("script");t.src=src;t.onload=res;t.onerror=function(){rej(new Error("nofirebase"))};document.head.appendChild(t)})}
+function openStore(){
+  function fallback(){
+    var cfg=window.FIREBASE_CONFIG;
+    if(!cfg||!cfg.apiKey){S.mode="local";return Promise.resolve(localStore())}
+    S.mode="cloud";
+    var base="https://www.gstatic.com/firebasejs/10.12.2/";
+    return loadScript(base+"firebase-app-compat.js").then(function(){return loadScript(base+"firebase-auth-compat.js")}).then(function(){return loadScript(base+"firebase-firestore-compat.js")})
+      .then(function(){firebase.initializeApp(cfg);return firebase.auth().signInAnonymously()}).then(function(){return firebase.firestore()})
+      .catch(function(e){if(e&&e.message==="nofirebase"){S.err="nofirebase";return null}throw e});
+  }
+  /* Inside a Claude artifact the shared "db" capability is used; anywhere else Firebase or local mode. */
+  if(window.claude&&typeof window.claude.use==="function"){
+    window.claude.use("downloads").then(function(d){S.dl=d}).catch(function(){});
+    return window.claude.use("db").then(function(db){if(db){S.mode="claude";return db}return fallback()}).catch(fallback);
+  }
+  return fallback();
+}
+
+/* ---------- connect ---------- */
+parseHash();render();
+(function(){
+  var timer=setTimeout(function(){if(S.state==="loading"){S.slow=true;renderBanner()}},10000);
+  function onErr(e){S.err=(e&&(e.code||e.message))||"error";render()}
+  openStore().then(function(db){
+    if(!db){clearTimeout(timer);render();return}
+    S.db=db;
+    db.collection("doors").onSnapshot(function(s){
+      var m={};s.docs.forEach(function(d){var x=d.data();if(x&&x.door)m[x.door]=x});
+      S.doors=m;
+      if(!s.metadata.fromCache&&S.state==="loading"){S.state="ready";S.slow=false;clearTimeout(timer)}
+      render();
+    },onErr);
+    db.collection("picks").onSnapshot(function(s){
+      S.picks=s.docs.map(function(d){var x=d.data();x.id=d.id;return x});render();
+    },onErr);
+    db.collection("added").onSnapshot(function(s){
+      S.added=s.docs.map(function(d){var x=d.data();x.id=d.id;return x});render();
+    },onErr);
+    db.doc("config/products").onSnapshot(function(s){
+      S.products=s.exists?(s.data().list||[]):[];
+      if(!ED)CAT=S.products;
+      render();
+    },onErr);
+  }).catch(onErr);
+})();
+})();
+
+</script>
+</body>
+</html>
